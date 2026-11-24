@@ -9,7 +9,7 @@
 // Node 22, standard library only, no network, no clock, no randomness:
 // every run copies the same file, so every run writes identical bytes.
 
-import { copyFileSync, mkdirSync } from "node:fs";
+import { copyFileSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -18,6 +18,16 @@ const source = join(here, "entry.png");
 
 const outDir = process.env.MAKEFUN_OUTPUT_DIR ?? "/output";
 mkdirSync(outDir, { recursive: true });
-copyFileSync(source, join(outDir, "entry.png"));
 
-console.log("wrote entry.png");
+const target = join(outDir, "entry.png");
+copyFileSync(source, target);
+
+// The gate wants a whole PNG of at most 1 MiB: prove the delivered bytes
+// are exactly the committed picture before calling it done.
+const bytes = readFileSync(target);
+const PNG_SIGNATURE = [137, 80, 78, 71, 13, 10, 26, 10];
+const isPng = PNG_SIGNATURE.every((b, i) => bytes[i] === b);
+if (!isPng || bytes.length > 1_048_576) {
+  throw new Error(`entry.png failed its own check: png=${isPng} bytes=${bytes.length}`);
+}
+console.log(`wrote entry.png (${bytes.length} bytes)`);
